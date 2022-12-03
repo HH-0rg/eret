@@ -58,6 +58,7 @@ coverage.xml
 # Django stuff:
 *.log
 local_settings.py
+chromedriver_mac_arm64.zip
 db.sqlite3
 db.sqlite3-journal
 

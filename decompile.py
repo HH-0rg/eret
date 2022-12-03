@@ -131,7 +131,7 @@ def use_browser(gpt_code):
     USERNAME = os.getenv('CHAT_USERNAME')
     PASSWORD = os.getenv('CHAT_PASSWORD')
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    # chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
 
     cookie = {'name': '__Secure-next-auth.session-token', 'value': os.getenv('CHAT_SESSION'), 'domain': 'chat.openai.com', 'path': '/', 'secure': True, 'httpOnly': True, 'expires': '1672672819948'}
@@ -195,6 +195,7 @@ def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
 def get_desc(contract_addr, four_byte):
     t = decompileDeployed(f'goerli/{contract_addr}')
     functions = split_functions(t)
+    functions['stop'] = ''
     disp_table = main_anal(functions['main'])
     gpt_code = table_inlining(disp_table, four_byte, functions)
     return use_browser(gpt_code)
