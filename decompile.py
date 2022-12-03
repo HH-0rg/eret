@@ -136,8 +136,6 @@ def find_calls(lines, cache, functions):
 
 
 def use_browser(gpt_code):
-    load_dotenv()
-
     USERNAME = os.getenv('CHAT_USERNAME')
     PASSWORD = os.getenv('CHAT_PASSWORD')
     chrome_options = Options()
@@ -211,14 +209,24 @@ def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
     return gpt_code
 
 
+from panoramix.decompiler import decompile_address, decompile_bytecode
+ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+def get_gpt_query_new(contract_addr, four_byte):
+    fname = f"unknown{four_byte}"
+    gpt_code = decompile_address(contract_addr, fname).text
+    gpt_code = "\n".join(gpt_code.split('\n')[1:])
+    gpt_code = ansi_escape.sub('', gpt_code)
+    gpt_code = gpt_code.lstrip()
+    gpt_code = f"Explain the {fname} function of this ethereum pseudocode:\n " + gpt_code
+    return gpt_code
 # def dependency_graph(func):
 
 def get_desc(contract_addr, four_byte):
-    t = decompileDeployed(f'goerli/{contract_addr}')
-    functions = split_functions(t)
-    functions['stop'] = ''
-    disp_table = main_anal(functions['main'])
-    gpt_code = table_inlining(disp_table, four_byte, functions)
+    # t = decompileDeployed(f'goerli/{contract_addr}')
+    # functions = split_functions(t)
+    # functions['stop'] = ''
+    # disp_table = main_anal(functions['main'])
+    gpt_code = get_gpt_query_new(contract_addr, four_byte)
     return use_browser(gpt_code)
 
 
@@ -246,4 +254,5 @@ def hello_world():
 
 
 if __name__ == '__main__':
+    load_dotenv()
     app.run(port=8000, debug=True, host='0.0.0.0')
