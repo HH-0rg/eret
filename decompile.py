@@ -189,8 +189,10 @@ def use_browser(gpt_code):
     return elementText
 
 
-def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
-    dispatch = switch_table[fourbyte]
+# def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
+#     dispatch = switch_table[fourbyte]
+def table_inlining(function_name: str, functions: dict):
+    dispatch = functions[function_name]
     # dependencies = set()
     # RIP
     calls, _ = find_calls(dispatch, set(), functions)
@@ -213,20 +215,20 @@ def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
 
 # def dependency_graph(func):
 
-def get_desc(contract_addr, four_byte):
+def get_desc(contract_addr):
     t = decompileDeployed(f'goerli/{contract_addr}')
     functions = split_functions(t)
     functions['stop'] = ''
-    disp_table = main_anal(functions['main'])
-    gpt_code = table_inlining(disp_table, four_byte, functions)
+    # disp_table = main_anal(functions['main'])
+    gpt_code = table_inlining("main", functions)
     return use_browser(gpt_code)
 
 
 @app.route("/description", methods=["GET"])
 def hello_world():
     contract_addr = request.args.get('contract_addr')
-    four_byte = request.args.get('four_byte')
-    return {"description": get_desc(contract_addr, four_byte)}
+    # four_byte = request.args.get('four_byte')
+    return {"description": get_desc(contract_addr)}
 
 # def main():
     # t = decompile('0x6060604052341561000f57600080fd5b604051602080610149833981016040528080519060200190919050505b806000819055505b505b6101a88061005a6000396000f30060606040526000357c01000')
