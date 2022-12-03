@@ -229,12 +229,28 @@ def get_desc(contract_addr, four_byte):
     gpt_code = get_gpt_query_new(contract_addr, four_byte)
     return use_browser(gpt_code)
 
+def get_desc_q(queue, contract_addr, four_byte):
+    # t = decompileDeployed(f'goerli/{contract_addr}')
+    # functions = split_functions(t)
+    # functions['stop'] = ''
+    # disp_table = main_anal(functions['main'])
+    gpt_code = get_gpt_query_new(contract_addr, four_byte)
+    queue.put(use_browser(gpt_code))
+
+from multiprocessing import Process, Queue
+def get_desc_new_process(contract_addr, four_byte):
+    q = Queue()
+    p = Process(target=get_desc_q, args=(q, contract_addr, four_byte))
+    p.start()
+    p.join()
+    return q.get()
 
 @app.route("/description", methods=["GET"])
 def hello_world():
     contract_addr = request.args.get('contract_addr')
     four_byte = request.args.get('four_byte')
-    return {"description": get_desc(contract_addr, four_byte)}
+    fuck = get_desc_new_process(contract_addr, four_byte)
+    return {"description": fuck}
 
 # def main():
     # t = decompile('0x6060604052341561000f57600080fd5b604051602080610149833981016040528080519060200190919050505b806000819055505b505b6101a88061005a6000396000f30060606040526000357c01000')
