@@ -126,23 +126,12 @@ def use_browser(gpt_code):
     PASSWORD = os.getenv('CHAT_PASSWORD')
     driver = webdriver.Chrome('./chromedriver')
 
+    cookie = {'name': '__Secure-next-auth.session-token', 'value': os.getenv('CHAT_SESSION'), 'domain': 'chat.openai.com', 'path': '/', 'secure': True, 'httpOnly': True, 'expires': '1672672819948'}
 
-    driver.get("https://chat.openai.com")
-    element = driver.find_elements(By.TAG_NAME, "button")[0]
-    element.click()
-    element = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.ID, "username")) #This is a dummy element
-    )
-    element.send_keys(USERNAME)
-    element = driver.find_elements(By.TAG_NAME, "button")[0]
-    element.click()
-    element = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.ID, "password")) #This is a dummy element
-    )
-    element.send_keys(PASSWORD)
-    time.sleep(1)
-    element = driver.find_elements(By.TAG_NAME, "button")[1]
-    element.click()
+    driver.get("https://chat.openai.com/chat")
+    driver.add_cookie(cookie)
+    driver.get("https://chat.openai.com/chat")
+
     element = WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Next')]"))
     )
@@ -166,7 +155,12 @@ def use_browser(gpt_code):
     actions = ActionChains(driver)
     actions.key_down(Keys.ENTER).perform()
     # actions.perform()
-    time.sleep(500)
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Try again')]"))
+    )
+    element = driver.find_elements(By.XPATH, "//div[contains(@class, 'ConversationItem__Message')]")[-1]
+    time.sleep(5000)
+    return element.text
 
 def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
     dispatch = switch_table[fourbyte]
