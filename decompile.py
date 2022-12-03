@@ -141,7 +141,7 @@ def use_browser(gpt_code):
     USERNAME = os.getenv('CHAT_USERNAME')
     PASSWORD = os.getenv('CHAT_PASSWORD')
     chrome_options = Options()
-    # chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
 
     cookie = {'name': '__Secure-next-auth.session-token', 'value': os.getenv(
@@ -183,9 +183,10 @@ def use_browser(gpt_code):
             (By.XPATH, "//*[contains(text(),'Try again')]"))
     )
     element = driver.find_elements(
-        By.XPATH, "//div[contains(@class, 'ConversationItem__Message')]").get_css_value('display')[-1]
+        By.XPATH, "//div[contains(@class, 'ConversationItem__Message')]")[-1]
+    elementText = str(element.text)
     driver.close()
-    return str(element.get_attribute('innerHTML'))
+    return elementText
 
 
 def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
@@ -245,4 +246,4 @@ def hello_world():
 
 
 if __name__ == '__main__':
-    app.run(port=8000, debug=True)
+    app.run(port=8000, debug=True, host='0.0.0.0')
