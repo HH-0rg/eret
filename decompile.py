@@ -213,7 +213,7 @@ from panoramix.decompiler import decompile_address, decompile_bytecode
 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 def get_gpt_query_new(contract_addr, four_byte):
     fname = f"unknown{four_byte}"
-    gpt_code = decompile_address(contract_addr, fname).text
+    gpt_code = decompile_address(contract_addr, None).text
     gpt_code = "\n".join(gpt_code.split('\n')[1:])
     gpt_code = ansi_escape.sub('', gpt_code)
     gpt_code = gpt_code.lstrip()
