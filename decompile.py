@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
+
 def decompile(source):
     r = requests.post('https://ethervm.io/decompile', data={'bytecode': source})
     return r.text
@@ -67,10 +68,34 @@ def main_anal(main_src: str):
             i += 1
     return result
 
+def find_calls(lines):
+    found = []
+    sanitized = ""
+    for line in lines.split('\n'):
+        if "//" not in line:
+            sanitized += line + "\n"
+
+    calls = re.findall("([a-zA-Z0-9_]*)\(([a-zA-Z0-9_\, ]*)\)", sanitized)
+
+    return [i for i,_ in calls]
+
 def table_inlining(table: dict, fourbyte: str):
     dispatch = table[fourbyte]
-    gpt_code = "contract Contract {\n    function main() {\n" + dispatch + "\n    }\n}"
+    # dependencies = set()
+    # RIP
+    # calls = find_calls(dispatch)
+
+    dependencies = ''
+    for func, body in table.items():
+        if "main" not in func:
+            dependencies += f"function {func}(){{ {body}\n }}\n"
+
+    gpt_code = "contract Contract {\n" + dependencies + "     function main() {\n" + dispatch + "\n    }\n}"
     print(gpt_code)
+    # print(dispatch)
+
+
+# def dependency_graph(func):
 
 
 def main():
