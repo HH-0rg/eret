@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+import json
 import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -17,17 +18,21 @@ from flask import request
 
 app = Flask(__name__)
 
+
 def decompile(source):
-    r = requests.post('https://ethervm.io/decompile', data={'bytecode': source})
+    r = requests.post('https://ethervm.io/decompile',
+                      data={'bytecode': source})
     return r.text
+
 
 def decompileDeployed(address):
     r = requests.get('https://ethervm.io/decompile/' + address)
     soup = BeautifulSoup(r.text, 'html.parser')
-    arr =  soup.find_all('div', class_='code javascript')
-    assert(len(arr) == 1)
+    arr = soup.find_all('div', class_='code javascript')
+    assert (len(arr) == 1)
     t = arr[0].text
     return t
+
 
 def split_functions(code: str):
     result = dict()
@@ -60,6 +65,7 @@ def split_functions(code: str):
         i += 1
     return result
 
+
 def remove_comments(code: str):
     lines = code.split('\n')
     result = ""
@@ -69,6 +75,7 @@ def remove_comments(code: str):
             line = line[:idx]
         result += line + '\n'
     return result
+
 
 def main_anal(main_src: str):
     result = dict()
@@ -104,6 +111,7 @@ def main_anal(main_src: str):
             i += 1
     return result
 
+
 def find_calls(lines, cache, functions):
     sanitized = ""
     for line in lines.split('\n'):
@@ -111,7 +119,7 @@ def find_calls(lines, cache, functions):
             sanitized += line + "\n"
 
     calls = re.findall("([a-zA-Z0-9_]+)\(([a-zA-Z0-9_\, ]*)\)", sanitized)
-    calls = set([i for i,_ in calls])
+    calls = set([i for i, _ in calls])
 
     print(calls)
     print(lines)
@@ -119,11 +127,13 @@ def find_calls(lines, cache, functions):
     for call in calls:
         if call not in cache:
             cache.add(call)
-            calls_temp1, cache_tamp = find_calls(functions[call], cache, functions)
+            calls_temp1, cache_tamp = find_calls(
+                functions[call], cache, functions)
             cache.update(cache_tamp)
             calls_temp.update(calls_temp1)
     calls.update(calls_temp)
     return calls, cache
+
 
 def use_browser(gpt_code):
     load_dotenv()
@@ -134,22 +144,26 @@ def use_browser(gpt_code):
     # chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
 
-    cookie = {'name': '__Secure-next-auth.session-token', 'value': os.getenv('CHAT_SESSION'), 'domain': 'chat.openai.com', 'path': '/', 'secure': True, 'httpOnly': True, 'expires': '1672672819948'}
+    cookie = {'name': '__Secure-next-auth.session-token', 'value': os.getenv(
+        'CHAT_SESSION'), 'domain': 'chat.openai.com', 'path': '/', 'secure': True, 'httpOnly': True, 'expires': '1672672819948'}
 
     driver.get("https://chat.openai.com/chat")
     driver.add_cookie(cookie)
     driver.get("https://chat.openai.com/chat")
 
     element = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Next')]"))
+        EC.presence_of_element_located(
+            (By.XPATH, "//*[contains(text(),'Next')]"))
     )
     element.click()
     element = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Next')]"))
+        EC.presence_of_element_located(
+            (By.XPATH, "//*[contains(text(),'Next')]"))
     )
     element.click()
     element = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Done')]"))
+        EC.presence_of_element_located(
+            (By.XPATH, "//*[contains(text(),'Done')]"))
     )
     element.click()
     element = WebDriverWait(driver, 30).until(
@@ -159,15 +173,20 @@ def use_browser(gpt_code):
     for i in gpt_code.split('\n'):
         actions = ActionChains(driver)
         actions.send_keys(i)
-        actions.key_down(Keys.SHIFT).key_down(Keys.ENTER).key_up(Keys.SHIFT).perform()
+        actions.key_down(Keys.SHIFT).key_down(
+            Keys.ENTER).key_up(Keys.SHIFT).perform()
     actions = ActionChains(driver)
     actions.key_down(Keys.ENTER).perform()
     # actions.perform()
     element = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Try again')]"))
+        EC.presence_of_element_located(
+            (By.XPATH, "//*[contains(text(),'Try again')]"))
     )
-    element = driver.find_elements(By.XPATH, "//div[contains(@class, 'ConversationItem__Message')]")[-1]
-    return element.text
+    element = driver.find_elements(
+        By.XPATH, "//div[contains(@class, 'ConversationItem__Message')]").get_css_value('display')[-1]
+    driver.close()
+    return str(element.get_attribute('innerHTML'))
+
 
 def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
     dispatch = switch_table[fourbyte]
@@ -181,7 +200,8 @@ def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
         if "main" not in func:
             dependencies += f"{functions[func]}\n\n"
 
-    gpt_code = "contract Contract {\n" + dependencies + "   function main() {\n" + dispatch + "\n   }\n}"
+    gpt_code = "contract Contract {\n" + dependencies + \
+        "   function main() {\n" + dispatch + "\n   }\n}"
     print(gpt_code)
     # print(dispatch)
     # print(find_calls(gpt_code))
@@ -223,5 +243,6 @@ def hello_world():
 
 # main()
 
+
 if __name__ == '__main__':
-    app.run(port=8000,debug=True)
+    app.run(port=8000, debug=True)
