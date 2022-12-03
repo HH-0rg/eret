@@ -6,10 +6,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
 from dotenv import load_dotenv
 import os
 import time
 from selenium.webdriver.common.action_chains import ActionChains
+
+from flask import Flask
+from flask import request
+
+app = Flask(__name__)
 
 def decompile(source):
     r = requests.post('https://ethervm.io/decompile', data={'bytecode': source})
@@ -124,7 +130,9 @@ def use_browser(gpt_code):
 
     USERNAME = os.getenv('CHAT_USERNAME')
     PASSWORD = os.getenv('CHAT_PASSWORD')
-    driver = webdriver.Chrome('./chromedriver')
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    driver = webdriver.Chrome(options=chrome_options)
 
     cookie = {'name': '__Secure-next-auth.session-token', 'value': os.getenv('CHAT_SESSION'), 'domain': 'chat.openai.com', 'path': '/', 'secure': True, 'httpOnly': True, 'expires': '1672672819948'}
 
@@ -159,7 +167,6 @@ def use_browser(gpt_code):
         EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Try again')]"))
     )
     element = driver.find_elements(By.XPATH, "//div[contains(@class, 'ConversationItem__Message')]")[-1]
-    time.sleep(5000)
     return element.text
 
 def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
@@ -180,7 +187,7 @@ def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
     # print(find_calls(gpt_code))
     gpt_code = "Explain the main function of this solidity code:\n " + gpt_code
     gpt_code = remove_comments(gpt_code)
-    use_browser(gpt_code)
+    return gpt_code
 
 
 # def dependency_graph(func):
@@ -189,10 +196,17 @@ def get_desc(contract_addr, four_byte):
     t = decompileDeployed(f'goerli/{contract_addr}')
     functions = split_functions(t)
     disp_table = main_anal(functions['main'])
-    table_inlining(disp_table, four_byte, functions)
+    gpt_code = table_inlining(disp_table, four_byte, functions)
+    return use_browser(gpt_code)
 
 
-def main():
+@app.route("/description", methods=["GET"])
+def hello_world():
+    contract_addr = request.args.get('contract_addr')
+    four_byte = request.args.get('four_byte')
+    return {"description": get_desc(contract_addr, four_byte)}
+
+# def main():
     # t = decompile('0x6060604052341561000f57600080fd5b604051602080610149833981016040528080519060200190919050505b806000819055505b505b6101a88061005a6000396000f30060606040526000357c01000')
     # t = decompile("608060405234801561001057600080fd5b506004361061002b5760003560e01c80636d4ce63c14610030575b600080fd5b61003861004e565b604051610045919061011b565b60405180910390f35b60606040518060400160405280600b81526020017f48656c6c6f20576f726c64000000000000000000000000000000000000000000815250905090565b600081519050919050565b600082825260208201905092915050565b60005b838110156100c55780820151818401526020810190506100aa565b60008484015250505050565b6000601f19601f8301169050919050565b60006100ed8261008b565b6100f78185610096565b93506101078185602086016100a7565b610110816100d1565b840191505092915050565b6000602082019050818103600083015261013581846100e2565b90509291505056fea264697066735822122060d589c0326dc8c65fc912551940071d46baa60a7a71c31b811b740531ee629964736f6c63430008110033")
     # t = decompileDeployed('0x949a6ac29b9347b3eb9a420272a9dd7890b787a3')
@@ -203,8 +217,10 @@ def main():
     # functions = split_functions(t)
     # disp_table = main_anal(functions['main'])
     # table_inlining(disp_table, "12065fe0", functions)
-    get_desc("0xcd752a50d5eb0ff53d0f87fb57208c961646e1ad", "12065fe0")
+    # get_desc("0xcd752a50d5eb0ff53d0f87fb57208c961646e1ad", "12065fe0")
     # table_inlining(disp_table, "013cf08b", functions)
 
+# main()
 
-main()
+if __name__ == '__main__':
+    app.run(port=8000,debug=True)
