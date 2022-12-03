@@ -1,7 +1,15 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from dotenv import load_dotenv
+import os
+import time
+from selenium.webdriver.common.action_chains import ActionChains
 
 def decompile(source):
     r = requests.post('https://ethervm.io/decompile', data={'bytecode': source})
@@ -23,8 +31,20 @@ def split_functions(code: str):
     while i < len(lines):
         line = lines[i]
         if line.startswith('    function'):
-            funname = re.search('function (.*)\(', line).group(1)
+            funidx = line.index('function ') + len('function ')
+            funname = line[funidx:]
+            funname = funname[:funname.index('(')]
             currfun = line + '\n'
+            brac = 0
+            for c in line:
+                if c == '{':
+                    brac += 1
+                elif c == '}':
+                    brac -= 1
+            if brac == 0:
+                result[funname] = line
+                i += 1
+                continue
             i += 1
             while not lines[i].startswith('    }'):
                 currfun += lines[i] + '\n'
@@ -32,6 +52,16 @@ def split_functions(code: str):
             currfun += lines[i]
             result[funname] = currfun
         i += 1
+    return result
+
+def remove_comments(code: str):
+    lines = code.split('\n')
+    result = ""
+    for line in lines:
+        if "//" in line:
+            idx = line.index("//")
+            line = line[:idx]
+        result += line + '\n'
     return result
 
 def main_anal(main_src: str):
@@ -68,34 +98,104 @@ def main_anal(main_src: str):
             i += 1
     return result
 
-def find_calls(lines):
-    found = []
+def find_calls(lines, cache, functions):
     sanitized = ""
     for line in lines.split('\n'):
         if "//" not in line:
             sanitized += line + "\n"
 
-    calls = re.findall("([a-zA-Z0-9_]*)\(([a-zA-Z0-9_\, ]*)\)", sanitized)
+    calls = re.findall("([a-zA-Z0-9_]+)\(([a-zA-Z0-9_\, ]*)\)", sanitized)
+    calls = set([i for i,_ in calls])
 
-    return [i for i,_ in calls]
+    print(calls)
+    print(lines)
+    calls_temp = set()
+    for call in calls:
+        if call not in cache:
+            cache.add(call)
+            calls_temp1, cache_tamp = find_calls(functions[call], cache, functions)
+            cache.update(cache_tamp)
+            calls_temp.update(calls_temp1)
+    calls.update(calls_temp)
+    return calls, cache
 
-def table_inlining(table: dict, fourbyte: str):
-    dispatch = table[fourbyte]
+def use_browser(gpt_code):
+    load_dotenv()
+
+    USERNAME = os.getenv('CHAT_USERNAME')
+    PASSWORD = os.getenv('CHAT_PASSWORD')
+    driver = webdriver.Chrome('./chromedriver')
+
+
+    driver.get("https://chat.openai.com")
+    element = driver.find_elements(By.TAG_NAME, "button")[0]
+    element.click()
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.ID, "username")) #This is a dummy element
+    )
+    element.send_keys(USERNAME)
+    element = driver.find_elements(By.TAG_NAME, "button")[0]
+    element.click()
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.ID, "password")) #This is a dummy element
+    )
+    element.send_keys(PASSWORD)
+    time.sleep(1)
+    element = driver.find_elements(By.TAG_NAME, "button")[1]
+    element.click()
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Next')]"))
+    )
+    element.click()
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Next')]"))
+    )
+    element.click()
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Done')]"))
+    )
+    element.click()
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.TAG_NAME, "textarea"))
+    )
+    time.sleep(1)
+    for i in gpt_code.split('\n'):
+        actions = ActionChains(driver)
+        actions.send_keys(i)
+        actions.key_down(Keys.SHIFT).key_down(Keys.ENTER).key_up(Keys.SHIFT).perform()
+    actions = ActionChains(driver)
+    actions.key_down(Keys.ENTER).perform()
+    # actions.perform()
+    time.sleep(500)
+
+def table_inlining(switch_table: dict, fourbyte: str, functions: dict):
+    dispatch = switch_table[fourbyte]
     # dependencies = set()
     # RIP
-    # calls = find_calls(dispatch)
-
+    calls, _ = find_calls(dispatch, set(), functions)
+    print(calls)
     dependencies = ''
-    for func, body in table.items():
+    # for func in functions.keys():
+    for func in calls:
         if "main" not in func:
-            dependencies += f"function {func}(){{ {body}\n }}\n"
+            dependencies += f"{functions[func]}\n\n"
 
-    gpt_code = "contract Contract {\n" + dependencies + "     function main() {\n" + dispatch + "\n    }\n}"
+    gpt_code = "contract Contract {\n" + dependencies + "   function main() {\n" + dispatch + "\n   }\n}"
     print(gpt_code)
     # print(dispatch)
+    # print(find_calls(gpt_code))
+    gpt_code = "Explain the main function of this solidity code:\n " + gpt_code
+    gpt_code = remove_comments(gpt_code)
+    use_browser(gpt_code)
 
 
 # def dependency_graph(func):
+
+def get_desc(contract_addr, four_byte):
+    t = decompileDeployed(f'goerli/{contract_addr}')
+    functions = split_functions(t)
+    disp_table = main_anal(functions['main'])
+    table_inlining(disp_table, four_byte, functions)
 
 
 def main():
@@ -104,9 +204,13 @@ def main():
     # t = decompileDeployed('0x949a6ac29b9347b3eb9a420272a9dd7890b787a3')
     # t = decompileDeployed('goerli/0x7C8C21927530f3776F6C057B71E408D88ABbb881')
     # t = decompileDeployed('goerli/0x138B359b8239B85793D8749De2C055b4e57e8958')
-    t = decompileDeployed('goerli/0x773E6AA19BAB7bc35F49f6ced6fd6109F775B949')
-    functions = split_functions(t)
-    disp_table = main_anal(functions['main'])
-    table_inlining(disp_table, "013cf08b")
+    # t = decompileDeployed('goerli/0x773E6AA19BAB7bc35F49f6ced6fd6109F775B949')
+    # t = decompileDeployed('goerli/0xcd752a50d5eb0ff53d0f87fb57208c961646e1ad')
+    # functions = split_functions(t)
+    # disp_table = main_anal(functions['main'])
+    # table_inlining(disp_table, "12065fe0", functions)
+    get_desc("0xcd752a50d5eb0ff53d0f87fb57208c961646e1ad", "12065fe0")
+    # table_inlining(disp_table, "013cf08b", functions)
+
 
 main()
