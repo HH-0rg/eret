@@ -12,12 +12,14 @@ from dotenv import load_dotenv
 import os
 import time
 from selenium.webdriver.common.action_chains import ActionChains
+from flask_cors import CORS, cross_origin
 
 from flask import Flask
 from flask import request
 
 app = Flask(__name__)
-
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 def decompile(source):
     r = requests.post('https://ethervm.io/decompile',
@@ -249,6 +251,7 @@ def get_desc_new_process(contract_addr, four_byte):
     return q.get()
 
 @app.route("/description", methods=["GET"])
+@cross_origin()
 def hello_world():
     contract_addr = request.args.get('contract_addr')
     four_byte = request.args.get('four_byte')
