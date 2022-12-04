@@ -115,8 +115,7 @@ def fetch_sigs(hash):
             }
         )
 
-    # return res
-    return []
+    return res
 
 
 @cached
@@ -138,13 +137,12 @@ def fetch_sig(hash):
     # Take the one that cooccurs with the most things, it's probably the most relevant.
     row = max(results, key=lambda row: len(row[4]))
 
-    # return {
-    #     "hash": hash,
-    #     "name": row[1],
-    #     "folded_name": row[2],
-    #     "params": json.loads(row[3]),
-    # }
-    return None
+    return {
+        "hash": hash,
+        "name": row[1],
+        "folded_name": row[2],
+        "params": json.loads(row[3]),
+    }
 
 
 """
