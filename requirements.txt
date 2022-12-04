@@ -7,3 +7,4 @@ coloredlogs
 web3
 appdirs
 timeout_decorator
+flask-cors
